@@ -264,6 +264,7 @@
     "node-domexception": "^1.0.0",
     "node-fetch": "^3.3.1",
     "node-schedule": "^2.1.1",
+    "nodemon": "^2.0.22",
     "normalize-package-data": "^2.5.0",
     "normalize-path": "^3.0.0",
     "nssocket": "^0.6.0",

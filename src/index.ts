@@ -21,7 +21,7 @@ interface IMediaResponse {
     error?: string;
 }
 
-function Dyoutube(url: string, musicOnly: boolean = true, formatID: number = 249): Promise<any> {
+function Dyoutube(url: string, formatID: number = 249): Promise<any> {
     return new Promise((resolve, reject) => {
         youtubedl(url, {
             dumpSingleJson: true,
@@ -35,7 +35,7 @@ function Dyoutube(url: string, musicOnly: boolean = true, formatID: number = 249
         })
             .then((output: any) => {
                 for (let item of output.formats) {
-                    if(item.format_id == formatID) {
+                    if (item.format_id == formatID) {
                         const response = {
                             title: output.title,
                             url: item.url,
@@ -71,13 +71,13 @@ async function Cstatus(interaction: any) {
     if (interaction.guild.iconURL()) {
         replyEmbed.setThumbnail(interaction.guild.iconURL());
     }
-    interaction.reply({ embeds: [replyEmbed] });
+    await interaction.reply({ embeds: [replyEmbed] });
 }
 
 async function Cyoutube_download_music(interaction: any) {
     const channel = interaction.member.voice?.channel;
     if (!channel) {
-        interaction.reply('你必須先加入語音頻道');
+        await interaction.reply('你必須先加入語音頻道');
         return;
     }
     const userid = interaction.user.id;
@@ -97,17 +97,17 @@ async function Cyoutube_download_music(interaction: any) {
             connection.subscribe(player);
             const filename = `${mediaPath}/music_${userid}.mp3`
             fs.rmSync(filename, { recursive: true, force: true });
-            download(res.url, filename)
+            download(res.url, filename);
             const resource = createAudioResource(`${mediaPath}/music_${userid}.mp3/videoplayback.webm`);
             interaction.reply(`準備播放**${res.title}**`)
-            connection.on(VoiceConnectionStatus.Ready, () => {
+            connection.on(VoiceConnectionStatus.Ready, async () => {
                 player.play(resource);
-                interaction.reply(`已播放 **${res.title}**`);
+                await interaction.reply(`已播放 **${res.title}**`);
             });
         })
-        .catch((err: any) => {
+        .catch(async (err: any) => {
             console.error(err);
-            interaction.reply(`播放失敗: ${err}`);
+            await interaction.reply(`播放失敗: ${err}`);
         })
 }
 
@@ -115,7 +115,7 @@ async function Cyoutube_download_music(interaction: any) {
 const CFunctions: IFunctionDict = {
     'status': Cstatus,
     'y': Cyoutube_download_music,
-    'yv': (interaction:any) => {interaction.reply('敬請期待')}
+    'yv': async (interaction: any) => { await interaction.reply('敬請期待') }
 }
 
 // init the client

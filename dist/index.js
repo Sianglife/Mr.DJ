@@ -34,22 +34,60 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
+var _a;
 var _this = this;
-var _a = require('discord.js'), Client = _a.Client, GatewayIntentBits = _a.GatewayIntentBits;
+var _b = require('discord.js'), Client = _b.Client, GatewayIntentBits = _b.GatewayIntentBits;
 var Guilds = GatewayIntentBits.Guilds, GulidVoiceStatus = GatewayIntentBits.GulidVoiceStatus, GulidMessages = GatewayIntentBits.GulidMessages, MessageContent = GatewayIntentBits.MessageContent;
-var _b = require('@discordjs/voice'), joinVoiceChannel = _b.joinVoiceChannel, createAudioPlayer = _b.createAudioPlayer, createAudioResource = _b.createAudioResource, AudioPlayerStatus = _b.AudioPlayerStatus, VoiceConnectionStatus = _b.VoiceConnectionStatus, getVoiceConnection = _b.getVoiceConnection;
+var _c = require('@discordjs/voice'), joinVoiceChannel = _c.joinVoiceChannel, createAudioPlayer = _c.createAudioPlayer, createAudioResource = _c.createAudioResource, AudioPlayerStatus = _c.AudioPlayerStatus, VoiceConnectionStatus = _c.VoiceConnectionStatus, getVoiceConnection = _c.getVoiceConnection;
 var EmbedBuilder = require('discord.js').EmbedBuilder;
+var youtubedl = require('youtube-dl-exec');
+var fs = require('fs');
+var download = require('download');
 require('dotenv').config();
+var mediaPath = (_a = process.env.MEDIA_PATH) !== null && _a !== void 0 ? _a : './media';
+function Dyoutube(url, musicOnly, formatID) {
+    if (musicOnly === void 0) { musicOnly = true; }
+    if (formatID === void 0) { formatID = 249; }
+    return new Promise(function (resolve, reject) {
+        youtubedl(url, {
+            dumpSingleJson: true,
+            noCheckCertificates: true,
+            noWarnings: true,
+            preferFreeFormats: true,
+            addHeader: [
+                'referer:youtube.com',
+                'user-agent:googlebot'
+            ]
+        })
+            .then(function (output) {
+            for (var _i = 0, _a = output.formats; _i < _a.length; _i++) {
+                var item = _a[_i];
+                if (item.format_id == formatID) {
+                    var response = {
+                        title: output.title,
+                        url: item.url,
+                        // data: item,
+                    };
+                    console.log(response);
+                    resolve(response);
+                }
+            }
+        })
+            .catch(function (err) {
+            console.error(err);
+            reject(err);
+        });
+    });
+}
 var TOKEN = process.env.DISCORDBOT_TOKEN;
 // Cfunctions of commands
 function Cstatus(interaction) {
     var _a;
     return __awaiter(this, void 0, void 0, function () {
-        var GulidId, name, owner, memberCount, replyEmbed;
+        var GulidId, name, memberCount, replyEmbed;
         return __generator(this, function (_b) {
             GulidId = interaction.guildId;
             name = interaction.guild.name;
-            owner = interaction.guild.ownerId;
             memberCount = (_a = interaction.guild) === null || _a === void 0 ? void 0 : _a.memberCount;
             replyEmbed = new EmbedBuilder()
                 .setColor(0x0099ff)
@@ -63,25 +101,50 @@ function Cstatus(interaction) {
         });
     });
 }
-function Cytm(interaction) {
+function Cyoutube_download_music(interaction) {
+    var _a;
     return __awaiter(this, void 0, void 0, function () {
-        var url, connection, player, resource;
-        return __generator(this, function (_a) {
-            url = interaction.options.getString('url');
-            connection = getVoiceConnection(interaction.guildId);
+        var channel, userid, connection, player, url;
+        return __generator(this, function (_b) {
+            channel = (_a = interaction.member.voice) === null || _a === void 0 ? void 0 : _a.channel;
+            if (!channel) {
+                interaction.reply('你必須先加入語音頻道');
+                return [2 /*return*/];
+            }
+            userid = interaction.user.id;
+            connection = joinVoiceChannel({
+                channelId: channel.id,
+                guildId: channel.guild.id,
+                adapterCreator: channel.guild.voiceAdapterCreator,
+            });
             player = createAudioPlayer();
-            resource = createAudioResource(url);
-            connection.subscribe(player);
-            player.play(resource);
-            connection.on(VoiceConnectionStatus.Ready, function () {
-                interaction.reply('已撥放~');
+            url = interaction.options.getString('url');
+            Dyoutube(url)
+                .then(function (res) {
+                // console.log(res);
+                connection.subscribe(player);
+                var filename = "".concat(mediaPath, "/music_").concat(userid, ".mp3");
+                fs.rmSync(filename, { recursive: true, force: true });
+                download(res.url, filename);
+                var resource = createAudioResource("".concat(mediaPath, "/music_").concat(userid, ".mp3/videoplayback.webm"));
+                interaction.reply("\u6E96\u5099\u64AD\u653E**".concat(res.title, "**"));
+                connection.on(VoiceConnectionStatus.Ready, function () {
+                    player.play(resource);
+                    interaction.reply("\u5DF2\u64AD\u653E **".concat(res.title, "**"));
+                });
+            })
+                .catch(function (err) {
+                console.error(err);
+                interaction.reply("\u64AD\u653E\u5931\u6557: ".concat(err));
             });
             return [2 /*return*/];
         });
     });
 }
-var Cfunctions = {
-    "status": Cstatus
+var CFunctions = {
+    'status': Cstatus,
+    'y': Cyoutube_download_music,
+    'yv': function (interaction) { interaction.reply('敬請期待'); }
 };
 // init the client
 var client = new Client({
@@ -95,32 +158,19 @@ client.once('ready', function () {
     console.log('Ready!');
 });
 client.on('interactionCreate', function (interaction) { return __awaiter(_this, void 0, void 0, function () {
-    var commandName, _a;
-    return __generator(this, function (_b) {
-        switch (_b.label) {
+    var commandName;
+    return __generator(this, function (_a) {
+        switch (_a.label) {
             case 0:
                 if (!interaction.isChatInputCommand())
                     return [2 /*return*/];
                 commandName = interaction.commandName;
-                _a = commandName;
-                switch (_a) {
-                    case 'status': return [3 /*break*/, 1];
-                    case 'ytm': return [3 /*break*/, 3];
-                }
-                return [3 /*break*/, 5];
-            case 1: return [4 /*yield*/, Cstatus(interaction)];
-            case 2:
-                _b.sent();
-                return [3 /*break*/, 7];
-            case 3: return [4 /*yield*/, Cytm(interaction)];
-            case 4:
-                _b.sent();
-                _b.label = 5;
-            case 5: return [4 /*yield*/, interaction.reply('Unknown command.')];
-            case 6:
-                _b.sent();
-                _b.label = 7;
-            case 7: return [2 /*return*/];
+                // console.log(commandName);
+                return [4 /*yield*/, CFunctions[commandName](interaction)];
+            case 1:
+                // console.log(commandName);
+                _a.sent();
+                return [2 /*return*/];
         }
     });
 }); });
