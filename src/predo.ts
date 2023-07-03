@@ -8,8 +8,8 @@ export interface ICommand {
 
 const commands = [
   new SlashCommandBuilder().setName('status').setDescription('顯示機器人狀態'),
-  new SlashCommandBuilder().setName('ytm').setDescription('播放Youtube音訊').addStringOption((option: any) => option.setName('url').setDescription('Youtube Link').setRequired(true)),
-  // new SlashCommandBuilder().setName('ytv').setDescription('播放Youtube影片').addStringOption((option: any) => option.setName('query').setDescription('Youtube Link').setRequired(true)),
+  new SlashCommandBuilder().setName('y').setDescription('播放Youtube音訊').addStringOption((option: any) => option.setName('url').setDescription('Youtube Link').setRequired(true)),
+  new SlashCommandBuilder().setName('yv').setDescription('播放Youtube視訊').addStringOption((option: any) => option.setName('url').setDescription('Youtube Link').setRequired(true)),
 ]
 
 const TOKEN: string | undefined = process.env.DISCORDBOT_TOKEN;

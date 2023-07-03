@@ -4,24 +4,52 @@ const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerSta
 const { EmbedBuilder } = require('discord.js');
 const youtubedl = require('youtube-dl-exec');
 const fs = require('fs');
-require('dotenv').config();
+const download = require('download');
 
-function Dyoutube(url: string, musicOnly: boolean = true) {
-    const formatID: number = 234
-    youtubedl(url, {
-        dumpSingleJson: true,
-        noCheckCertificates: true,
-        noWarnings: true,
-        preferFreeFormats: true,
-        addHeader: [
-          'referer:youtube.com',
-          'user-agent:googlebot'
-        ]
-    }).then((output: any) => {
-        console.log(output.formats)
-        fs.writeFile('output.json', JSON.stringify(output.formats, null, 4), (err: any) => {
-            console.error(err);
-        });
+require('dotenv').config();
+const mediaPath = process.env.MEDIA_PATH ?? './media';
+
+interface IFunctionDict {
+    [key: string]: Function;
+}
+
+interface IMediaResponse {
+    title: string;
+    url: string;
+    format?: any;
+    quality?: string;
+    error?: string;
+}
+
+function Dyoutube(url: string, musicOnly: boolean = true, formatID: number = 249): Promise<any> {
+    return new Promise((resolve, reject) => {
+        youtubedl(url, {
+            dumpSingleJson: true,
+            noCheckCertificates: true,
+            noWarnings: true,
+            preferFreeFormats: true,
+            addHeader: [
+                'referer:youtube.com',
+                'user-agent:googlebot'
+            ]
+        })
+            .then((output: any) => {
+                for (let item of output.formats) {
+                    if(item.format_id == formatID) {
+                        const response = {
+                            title: output.title,
+                            url: item.url,
+                            // data: item,
+                        } as IMediaResponse;
+                        console.log(response)
+                        resolve(response);
+                    }
+                }
+            })
+            .catch((err: any) => {
+                console.error(err);
+                reject(err);
+            });
     })
 }
 
@@ -32,7 +60,6 @@ async function Cstatus(interaction: any) {
     // console.log(interaction);
     const GulidId = interaction.guildId;
     const name = interaction.guild.name;
-    const owner = interaction.guild.ownerId;
     const memberCount = interaction.guild?.memberCount;
     const replyEmbed = new EmbedBuilder()
         .setColor(0x0099ff)
@@ -47,12 +74,13 @@ async function Cstatus(interaction: any) {
     interaction.reply({ embeds: [replyEmbed] });
 }
 
-async function Cytm(interaction: any) {
+async function Cyoutube_download_music(interaction: any) {
     const channel = interaction.member.voice?.channel;
     if (!channel) {
         interaction.reply('你必須先加入語音頻道');
         return;
     }
+    const userid = interaction.user.id;
     const connection = joinVoiceChannel({
         channelId: channel.id,
         guildId: channel.guild.id,
@@ -60,28 +88,34 @@ async function Cytm(interaction: any) {
     });
     // const connection = getVoiceConnection(channel.guild.id);
     const player = createAudioPlayer();
-    
-    // source
+
+    // source and play
     const url: string = interaction.options.getString('url');
-    const downloader = Dyoutube(url);
-    const resource = createAudioResource("C:\\Users\\yu-si\\Downloads\\imotion_en.mp3");
-    // console.log(connection);
-    connection.subscribe(player);
-    connection.on(VoiceConnectionStatus.Ready, () => {
-        console.log(1);
-        player.play(resource);
-        console.log(2);
-        interaction.reply('已播放~');
-    })
+    Dyoutube(url)
+        .then((res: IMediaResponse) => {
+            // console.log(res);
+            connection.subscribe(player);
+            const filename = `${mediaPath}/music_${userid}.mp3`
+            fs.rmSync(filename, { recursive: true, force: true });
+            download(res.url, filename)
+            const resource = createAudioResource(`${mediaPath}/music_${userid}.mp3/videoplayback.webm`);
+            interaction.reply(`準備播放**${res.title}**`)
+            connection.on(VoiceConnectionStatus.Ready, () => {
+                player.play(resource);
+                interaction.reply(`已播放 **${res.title}**`);
+            });
+        })
+        .catch((err: any) => {
+            console.error(err);
+            interaction.reply(`播放失敗: ${err}`);
+        })
 }
 
-interface IFunctionDict {
-    [key: string]: Function;
-}
 
 const CFunctions: IFunctionDict = {
     'status': Cstatus,
-    'ytm': Cytm,
+    'y': Cyoutube_download_music,
+    'yv': (interaction:any) => {interaction.reply('敬請期待')}
 }
 
 // init the client
