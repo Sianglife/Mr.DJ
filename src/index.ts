@@ -5,6 +5,9 @@ const { EmbedBuilder } = require('discord.js');
 const youtubedl = require('youtube-dl-exec');
 const fs = require('fs');
 const download = require('download');
+const m3u8ToMp4 = require("m3u8-to-mp4");
+const converter = new m3u8ToMp4();
+
 
 require('dotenv').config();
 const mediaPath = process.env.MEDIA_PATH ?? './media';
@@ -16,40 +19,40 @@ interface IFunctionDict {
 interface IMediaResponse {
     title: string;
     url: string;
-    format?: any;
-    quality?: string;
-    error?: string;
 }
 
-function Dyoutube(url: string, formatID: number = 249): Promise<any> {
+function Dyoutube(url: string, formatID: number = 233): Promise<any> {
     return new Promise((resolve, reject) => {
-        youtubedl(url, {
+        const youtubedler = youtubedl.exec(url, {
             dumpSingleJson: true,
             noCheckCertificates: true,
             noWarnings: true,
             preferFreeFormats: true,
             addHeader: [
                 'referer:youtube.com',
-                'user-agent:googlebot'
+                'user-agent:googlebot',
             ]
         })
             .then((output: any) => {
-                for (let item of output.formats) {
+                // console.log(output.stdout)
+                const res = JSON.parse(output.stdout);
+                // console.log(JSON.stringify(res));
+                // fs.writeFile('output.json', JSON.stringify(res), (err: any)=>console.log(err));
+                for (let item of res.formats) {
                     if (item.format_id == formatID) {
                         const response = {
-                            title: output.title,
+                            title: res.title,
                             url: item.url,
-                            // data: item,
                         } as IMediaResponse;
-                        console.log(response)
                         resolve(response);
+                        // console.log(response);
+                        return;
                     }
                 }
             })
             .catch((err: any) => {
-                console.error(err);
                 reject(err);
-            });
+            })
     })
 }
 
@@ -75,11 +78,14 @@ async function Cstatus(interaction: any) {
 }
 
 async function Cyoutube_download_music(interaction: any) {
+    await interaction.deferReply({ ephemeral: true });
+    // console.log('start');
     const channel = interaction.member.voice?.channel;
     if (!channel) {
         await interaction.reply('你必須先加入語音頻道');
         return;
     }
+    
     const userid = interaction.user.id;
     const connection = joinVoiceChannel({
         channelId: channel.id,
@@ -91,23 +97,31 @@ async function Cyoutube_download_music(interaction: any) {
 
     // source and play
     const url: string = interaction.options.getString('url');
+    console.log(0);
     Dyoutube(url)
-        .then((res: IMediaResponse) => {
+    .then(async (res: IMediaResponse) => {
             // console.log(res);
+            console.log(111);
+            interaction.editReply(`準備播放**${res.title}**`, { ephemeral: true });
+            const filename = `${mediaPath}/music_${userid}.mp3`;
+            await converter
+            .setInputFile(res.url)
+            .setOutputFile(filename)
+            .start();
+            // await download(res.url, mediaPath, { filename: `music_${userid}.mp3` });
+            console.log(1);
+            const resource = createAudioResource(filename);
+            console.log(2);
+            player.play(resource);
+            console.log(4);
+            // interaction.edit(`已播放 **${res.title}**`, { ephemeral: false });
+            console.log(5);
             connection.subscribe(player);
-            const filename = `${mediaPath}/music_${userid}.mp3`
-            fs.rmSync(filename, { recursive: true, force: true });
-            download(res.url, filename);
-            const resource = createAudioResource(`${mediaPath}/music_${userid}.mp3/videoplayback.webm`);
-            interaction.reply(`準備播放**${res.title}**`)
-            connection.on(VoiceConnectionStatus.Ready, async () => {
-                player.play(resource);
-                await interaction.reply(`已播放 **${res.title}**`);
-            });
         })
         .catch(async (err: any) => {
             console.error(err);
-            await interaction.reply(`播放失敗: ${err}`);
+            await interaction.reply(`播放失敗: \`\`\`${err}\`\`\``);
+            connection.destroy();
         })
 }
 
@@ -137,5 +151,6 @@ client.on('interactionCreate', async (interaction: any) => {
     // console.log(commandName);
     await CFunctions[commandName](interaction);
 });
+
 
 client.login(TOKEN);
